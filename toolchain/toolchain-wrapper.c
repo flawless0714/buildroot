@@ -22,12 +22,19 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <time.h>
+#include <stdbool.h>
 
 #ifdef BR_CCACHE
 static char ccache_path[PATH_MAX];
 #endif
 static char path[PATH_MAX];
 static char sysroot[PATH_MAX];
+/* As would be defined by gcc:
+ *   https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
+ * sizeof() on string literals includes the terminating \0. */
+static char _time_[sizeof("-D__TIME__=\"HH:MM:SS\"")];
+static char _date_[sizeof("-D__DATE__=\"MMM DD YYYY\"")];
 
 /**
  * GCC errors out with certain combinations of arguments (examples are
@@ -35,12 +42,19 @@ static char sysroot[PATH_MAX];
  * that we only pass the predefined one to the real compiler if the inverse
  * option isn't in the argument list.
  * This specifies the worst case number of extra arguments we might pass
- * Currently, we have:
+ * Currently, we may have:
  * 	-mfloat-abi=
  * 	-march=
  * 	-mcpu=
+ * 	-D__TIME__=
+ * 	-D__DATE__=
+ * 	-Wno-builtin-macro-redefined
+ * 	-Wl,-z,now
+ * 	-Wl,-z,relro
+ * 	-fPIE
+ * 	-pie
  */
-#define EXCLUSIVE_ARGS	3
+#define EXCLUSIVE_ARGS	10
 
 static char *predef_args[] = {
 #ifdef BR_CCACHE
@@ -50,6 +64,9 @@ static char *predef_args[] = {
 	"--sysroot", sysroot,
 #ifdef BR_ABI
 	"-mabi=" BR_ABI,
+#endif
+#ifdef BR_NAN
+	"-mnan=" BR_NAN,
 #endif
 #ifdef BR_FPU
 	"-mfpu=" BR_FPU,
@@ -66,6 +83,12 @@ static char *predef_args[] = {
 #ifdef BR_OMIT_LOCK_PREFIX
 	"-Wa,-momit-lock-prefix=yes",
 #endif
+#ifdef BR_NO_FUSED_MADD
+	"-mno-fused-madd",
+#endif
+#ifdef BR_FP_CONTRACT_OFF
+	"-ffp-contract=off",
+#endif
 #ifdef BR_BINFMT_FLAT
 	"-Wl,-elf2flt",
 #endif
@@ -80,23 +103,132 @@ static char *predef_args[] = {
 #endif
 };
 
-static void check_unsafe_path(const char *path, int paranoid)
-{
-	char **c;
-	static char *unsafe_paths[] = {
-		"/lib", "/usr/include", "/usr/lib", "/usr/local/include", "/usr/local/lib", NULL,
-	};
+/* A {string,length} tuple, to avoid computing strlen() on constants.
+ *  - str must be a \0-terminated string
+ *  - len does not account for the terminating '\0'
+ */
+struct str_len_s {
+	const char *str;
+	size_t     len;
+};
 
-	for (c = unsafe_paths; *c != NULL; c++) {
-		if (!strncmp(path, *c, strlen(*c))) {
-			fprintf(stderr, "%s: %s: unsafe header/library path used in cross-compilation: '%s'\n",
-				program_invocation_short_name,
-				paranoid ? "ERROR" : "WARNING", path);
-			if (paranoid)
-				exit(1);
+/* Define a {string,length} tuple. Takes an unquoted constant string as
+ * parameter. sizeof() on a string literal includes the terminating \0,
+ * but we don't want to count it.
+ */
+#define STR_LEN(s) { #s, sizeof(#s)-1 }
+
+/* List of paths considered unsafe for cross-compilation.
+ *
+ * An unsafe path is one that points to a directory with libraries or
+ * headers for the build machine, which are not suitable for the target.
+ */
+static const struct str_len_s unsafe_paths[] = {
+	STR_LEN(/lib),
+	STR_LEN(/usr/include),
+	STR_LEN(/usr/lib),
+	STR_LEN(/usr/local/include),
+	STR_LEN(/usr/local/lib),
+	{ NULL, 0 },
+};
+
+/* Unsafe options are options that specify a potentialy unsafe path,
+ * that will be checked by check_unsafe_path(), below.
+ */
+static const struct str_len_s unsafe_opts[] = {
+	STR_LEN(-I),
+	STR_LEN(-idirafter),
+	STR_LEN(-iquote),
+	STR_LEN(-isystem),
+	STR_LEN(-L),
+	{ NULL, 0 },
+};
+
+/* Check if path is unsafe for cross-compilation. Unsafe paths are those
+ * pointing to the standard native include or library paths.
+ *
+ * We print the arguments leading to the failure. For some options, gcc
+ * accepts the path to be concatenated to the argument (e.g. -I/foo/bar)
+ * or separated (e.g. -I /foo/bar). In the first case, we need only print
+ * the argument as it already contains the path (arg_has_path), while in
+ * the second case we need to print both (!arg_has_path).
+ *
+ * If paranoid, exit in error instead of just printing a warning.
+ */
+static void check_unsafe_path(const char *arg,
+			      const char *path,
+			      int paranoid,
+			      int arg_has_path)
+{
+	const struct str_len_s *p;
+
+	for (p=unsafe_paths; p->str; p++) {
+		if (strncmp(path, p->str, p->len))
 			continue;
-		}
+		fprintf(stderr,
+			"%s: %s: unsafe header/library path used in cross-compilation: '%s%s%s'\n",
+			program_invocation_short_name,
+			paranoid ? "ERROR" : "WARNING",
+			arg,
+			arg_has_path ? "" : "' '", /* close single-quote, space, open single-quote */
+			arg_has_path ? "" : path); /* so that arg and path are properly quoted. */
+		if (paranoid)
+			exit(1);
 	}
+}
+
+/* Returns false if SOURCE_DATE_EPOCH was not defined in the environment.
+ *
+ * Returns true if SOURCE_DATE_EPOCH is in the environment and represent
+ * a valid timestamp, in which case the timestamp is formatted into the
+ * global variables _date_ and _time_.
+ *
+ * Aborts if SOURCE_DATE_EPOCH was set in the environment but did not
+ * contain a valid timestamp.
+ *
+ * Valid values are defined in the spec:
+ *     https://reproducible-builds.org/specs/source-date-epoch/
+ * but we further restrict them to be positive or null.
+ */
+bool parse_source_date_epoch_from_env(void)
+{
+	char *epoch_env, *endptr;
+	time_t epoch;
+	struct tm epoch_tm;
+
+	if ((epoch_env = getenv("SOURCE_DATE_EPOCH")) == NULL)
+		return false;
+	errno = 0;
+	epoch = (time_t) strtoll(epoch_env, &endptr, 10);
+	/* We just need to test if it is incorrect, but we do not
+	 * care why it is incorrect.
+	 */
+	if ((errno != 0) || !*epoch_env || *endptr || (epoch < 0)) {
+		fprintf(stderr, "%s: invalid SOURCE_DATE_EPOCH='%s'\n",
+			program_invocation_short_name,
+			epoch_env);
+		exit(1);
+	}
+	tzset(); /* For localtime_r(), below. */
+	if (localtime_r(&epoch, &epoch_tm) == NULL) {
+		fprintf(stderr, "%s: cannot parse SOURCE_DATE_EPOCH=%s\n",
+				program_invocation_short_name,
+				getenv("SOURCE_DATE_EPOCH"));
+		exit(1);
+	}
+	if (!strftime(_time_, sizeof(_time_), "-D__TIME__=\"%T\"", &epoch_tm)) {
+		fprintf(stderr, "%s: cannot set time from SOURCE_DATE_EPOCH=%s\n",
+				program_invocation_short_name,
+				getenv("SOURCE_DATE_EPOCH"));
+		exit(1);
+	}
+	if (!strftime(_date_, sizeof(_date_), "-D__DATE__=\"%b %e %Y\"", &epoch_tm)) {
+		fprintf(stderr, "%s: cannot set date from SOURCE_DATE_EPOCH=%s\n",
+				program_invocation_short_name,
+				getenv("SOURCE_DATE_EPOCH"));
+		exit(1);
+	}
+	return true;
 }
 
 int main(int argc, char **argv)
@@ -108,7 +240,7 @@ int main(int argc, char **argv)
 	char *env_debug;
 	char *paranoid_wrapper;
 	int paranoid;
-	int ret, i, count = 0, debug;
+	int ret, i, count = 0, debug, found_shared = 0;
 
 	/* Calculate the relative paths */
 	basename = strrchr(progpath, '/');
@@ -120,7 +252,7 @@ int main(int argc, char **argv)
 			perror(__FILE__ ": malloc");
 			return 2;
 		}
-		sprintf(relbasedir, "%s/../..", argv[0]);
+		sprintf(relbasedir, "%s/..", argv[0]);
 		absbasedir = realpath(relbasedir, NULL);
 	} else {
 		basename = progpath;
@@ -134,7 +266,7 @@ int main(int argc, char **argv)
 		for (i = ret; i > 0; i--) {
 			if (absbasedir[i] == '/') {
 				absbasedir[i] = '\0';
-				if (++count == 3)
+				if (++count == 2)
 					break;
 			}
 		}
@@ -150,14 +282,14 @@ int main(int argc, char **argv)
 #elif defined(BR_CROSS_PATH_ABS)
 	ret = snprintf(path, sizeof(path), BR_CROSS_PATH_ABS "/%s" BR_CROSS_PATH_SUFFIX, basename);
 #else
-	ret = snprintf(path, sizeof(path), "%s/usr/bin/%s" BR_CROSS_PATH_SUFFIX, absbasedir, basename);
+	ret = snprintf(path, sizeof(path), "%s/bin/%s" BR_CROSS_PATH_SUFFIX, absbasedir, basename);
 #endif
 	if (ret >= sizeof(path)) {
 		perror(__FILE__ ": overflow");
 		return 3;
 	}
 #ifdef BR_CCACHE
-	ret = snprintf(ccache_path, sizeof(ccache_path), "%s/usr/bin/ccache", absbasedir);
+	ret = snprintf(ccache_path, sizeof(ccache_path), "%s/bin/ccache", absbasedir);
 	if (ret >= sizeof(ccache_path)) {
 		perror(__FILE__ ": overflow");
 		return 3;
@@ -193,6 +325,20 @@ int main(int argc, char **argv)
 		*cur++ = "-mfloat-abi=" BR_FLOAT_ABI;
 #endif
 
+#ifdef BR_FP32_MODE
+	/* add fp32 mode if soft-float is not args or hard-float overrides soft-float */
+	int add_fp32_mode = 1;
+	for (i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "-msoft-float"))
+			add_fp32_mode = 0;
+		else if (!strcmp(argv[i], "-mhard-float"))
+			add_fp32_mode = 1;
+	}
+
+	if (add_fp32_mode == 1)
+		*cur++ = "-mfp" BR_FP32_MODE;
+#endif
+
 #if defined(BR_ARCH) || \
     defined(BR_CPU)
 	/* Add our -march/cpu flags, but only if none of
@@ -214,6 +360,87 @@ int main(int argc, char **argv)
 	}
 #endif /* ARCH || CPU */
 
+	if (parse_source_date_epoch_from_env()) {
+		*cur++ = _time_;
+		*cur++ = _date_;
+		/* This has existed since gcc-4.4.0. */
+		*cur++ = "-Wno-builtin-macro-redefined";
+	}
+
+#ifdef BR2_RELRO_FULL
+	/* Patterned after Fedora/Gentoo hardening approaches.
+	 * https://fedoraproject.org/wiki/Changes/Harden_All_Packages
+	 * https://wiki.gentoo.org/wiki/Hardened/Toolchain#Position_Independent_Executables_.28PIEs.29
+	 *
+	 * A few checks are added to allow disabling of PIE
+	 * 1) -fno-pie and -no-pie are used by other distros to disable PIE in
+	 *    cases where the compiler enables it by default. The logic below
+	 *    maintains that behavior.
+	 *         Ref: https://wiki.ubuntu.com/SecurityTeam/PIE
+	 * 2) A check for -fno-PIE has been used in older Linux Kernel builds
+	 *    in a similar way to -fno-pie or -no-pie.
+	 * 3) A check is added for Kernel and U-boot defines
+	 *    (-D__KERNEL__ and -D__UBOOT__).
+	 */
+	for (i = 1; i < argc; i++) {
+		/* Apply all incompatible link flag and disable checks first */
+		if (!strcmp(argv[i], "-r") ||
+		    !strcmp(argv[i], "-Wl,-r") ||
+		    !strcmp(argv[i], "-static") ||
+		    !strcmp(argv[i], "-D__KERNEL__") ||
+		    !strcmp(argv[i], "-D__UBOOT__") ||
+		    !strcmp(argv[i], "-fno-pie") ||
+		    !strcmp(argv[i], "-fno-PIE") ||
+		    !strcmp(argv[i], "-no-pie"))
+			break;
+		/* Record that shared was present which disables -pie but don't
+		 * break out of loop as a check needs to occur that possibly
+		 * still allows -fPIE to be set
+		 */
+		if (!strcmp(argv[i], "-shared"))
+			found_shared = 1;
+	}
+
+	if (i == argc) {
+		/* Compile and link condition checking have been kept split
+		 * between these two loops, as there maybe already are valid
+		 * compile flags set for position independence. In that case
+		 * the wrapper just adds the -pie for link.
+		 */
+		for (i = 1; i < argc; i++) {
+			if (!strcmp(argv[i], "-fpie") ||
+			    !strcmp(argv[i], "-fPIE") ||
+			    !strcmp(argv[i], "-fpic") ||
+			    !strcmp(argv[i], "-fPIC"))
+				break;
+		}
+		/* Both args below can be set at compile/link time
+		 * and are ignored correctly when not used
+		 */
+		if(i == argc)
+			*cur++ = "-fPIE";
+
+		if (!found_shared)
+			*cur++ = "-pie";
+	}
+#endif
+	/* Are we building the Linux Kernel or U-Boot? */
+	for (i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "-D__KERNEL__") ||
+		    !strcmp(argv[i], "-D__UBOOT__"))
+			break;
+	}
+	if (i == argc) {
+		/* https://wiki.gentoo.org/wiki/Hardened/Toolchain#Mark_Read-Only_Appropriate_Sections */
+#ifdef BR2_RELRO_PARTIAL
+		*cur++ = "-Wl,-z,relro";
+#endif
+#ifdef BR2_RELRO_FULL
+		*cur++ = "-Wl,-z,now";
+		*cur++ = "-Wl,-z,relro";
+#endif
+	}
+
 	paranoid_wrapper = getenv("BR_COMPILER_PARANOID_UNSAFE_PATH");
 	if (paranoid_wrapper && strlen(paranoid_wrapper) > 0)
 		paranoid = 1;
@@ -222,24 +449,23 @@ int main(int argc, char **argv)
 
 	/* Check for unsafe library and header paths */
 	for (i = 1; i < argc; i++) {
-
-		/* Skip options that do not start with -I and -L */
-		if (strncmp(argv[i], "-I", 2) && strncmp(argv[i], "-L", 2))
-			continue;
-
-		/* We handle two cases: first the case where -I/-L and
-		 * the path are separated by one space and therefore
-		 * visible as two separate options, and then the case
-		 * where they are stuck together forming one single
-		 * option.
-		 */
-		if (argv[i][2] == '\0') {
-			i++;
-			if (i == argc)
+		const struct str_len_s *opt;
+		for (opt=unsafe_opts; opt->str; opt++ ) {
+			/* Skip any non-unsafe option. */
+			if (strncmp(argv[i], opt->str, opt->len))
 				continue;
-			check_unsafe_path(argv[i], paranoid);
-		} else {
-			check_unsafe_path(argv[i] + 2, paranoid);
+
+			/* Handle both cases:
+			 *  - path is a separate argument,
+			 *  - path is concatenated with option.
+			 */
+			if (argv[i][opt->len] == '\0') {
+				i++;
+				if (i == argc)
+					break;
+				check_unsafe_path(argv[i-1], argv[i], paranoid, 0);
+			} else
+				check_unsafe_path(argv[i], argv[i] + opt->len, paranoid, 1);
 		}
 	}
 

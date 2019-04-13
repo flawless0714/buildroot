@@ -4,16 +4,25 @@
 #
 ################################################################################
 
-DOMOTICZ_VERSION = 3.4834
+DOMOTICZ_VERSION = 4.9700
 DOMOTICZ_SITE = $(call github,domoticz,domoticz,$(DOMOTICZ_VERSION))
-DOMOTICZ_LICENSE = GPLv3
+DOMOTICZ_LICENSE = GPL-3.0
 DOMOTICZ_LICENSE_FILES = License.txt
-DOMOTICZ_DEPENDENCIES = boost host-pkgconf libcurl lua mosquitto openssl \
-        sqlite zlib
+DOMOTICZ_DEPENDENCIES = \
+	boost \
+	host-pkgconf \
+	libcurl \
+	lua \
+	mosquitto \
+	openssl \
+	sqlite \
+	zlib
 
 # Due to the dependency on mosquitto, domoticz depends on
-# !BR2_STATIC_LIBS so set USE_STATIC_BOOST to OFF
-DOMOTICZ_CONF_OPTS += -DUSE_STATIC_BOOST=OFF
+# !BR2_STATIC_LIBS so set USE_STATIC_BOOST and USE_OPENSSL_STATIC to OFF
+DOMOTICZ_CONF_OPTS += \
+	-DUSE_STATIC_BOOST=OFF \
+	-DUSE_OPENSSL_STATIC=OFF
 
 # Do not use any built-in libraries which are enabled by default for
 # lua, sqlite and mqtt
@@ -34,6 +43,13 @@ DOMOTICZ_DEPENDENCIES += openzwave
 # domoticz will not find the openzwave library as it searches by
 # default a static library.
 DOMOTICZ_CONF_OPTS += -DUSE_STATIC_OPENZWAVE=OFF
+endif
+
+ifeq ($(BR2_PACKAGE_PYTHON3),y)
+DOMOTICZ_DEPENDENCIES += python3
+DOMOTICZ_CONF_OPTS += -DUSE_PYTHON=ON
+else
+DOMOTICZ_CONF_OPTS += -DUSE_PYTHON=OFF
 endif
 
 # Install domoticz in a dedicated directory (/opt/domoticz) as

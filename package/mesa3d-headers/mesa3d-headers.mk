@@ -12,9 +12,10 @@ endif
 
 # Not possible to directly refer to mesa3d variables, because of
 # first/second expansion trickery...
-MESA3D_HEADERS_VERSION = 11.2.2
+MESA3D_HEADERS_VERSION = 19.0.2
 MESA3D_HEADERS_SOURCE = mesa-$(MESA3D_HEADERS_VERSION).tar.xz
-MESA3D_HEADERS_SITE = ftp://ftp.freedesktop.org/pub/mesa/$(MESA3D_HEADERS_VERSION)
+MESA3D_HEADERS_SITE = https://mesa.freedesktop.org/archive
+MESA3D_HEADERS_DL_SUBDIR = mesa3d
 MESA3D_HEADERS_LICENSE = MIT, SGI, Khronos
 MESA3D_HEADERS_LICENSE_FILES = docs/license.html
 
@@ -34,9 +35,9 @@ ifeq ($(BR2_PACKAGE_XORG7),y)
 # contains -i.
 define MESA3D_HEADERS_BUILD_DRI_PC
 	sed -e 's:@\(exec_\)\?prefix@:/usr:' \
-	    -e 's:@libdir@:${exec_prefix}/lib:' \
-	    -e 's:@includedir@:${prefix}/include:' \
-	    -e 's:@DRI_DRIVER_INSTALL_DIR@:${libdir}/dri:' \
+	    -e 's:@libdir@:$${exec_prefix}/lib:' \
+	    -e 's:@includedir@:$${prefix}/include:' \
+	    -e 's:@DRI_DRIVER_INSTALL_DIR@:$${libdir}/dri:' \
 	    -e 's:@VERSION@:$(MESA3D_HEADERS_VERSION):' \
 	    -e 's:@DRI_PC_REQ_PRIV@::' \
 	    $(@D)/src/mesa/drivers/dri/dri.pc.in \
@@ -47,7 +48,7 @@ define MESA3D_HEADERS_INSTALL_DRI_PC
 	$(INSTALL) -D -m 0644 $(@D)/include/GL/internal/dri_interface.h \
 		$(STAGING_DIR)/usr/include/GL/internal/dri_interface.h
 	$(INSTALL) -D -m 0644 $(@D)/src/mesa/drivers/dri/dri.pc \
-		$(STAGING_DIR)/usr/lib/pkg-config/dri.pc
+		$(STAGING_DIR)/usr/lib/pkgconfig/dri.pc
 endef
 
 endif # Xorg
@@ -62,8 +63,8 @@ ifeq ($(BR2_PACKAGE_HAS_LIBGLES),y)
 MESA3D_HEADERS_DIRS += GLES GLES2
 endif
 
-ifeq ($(BR2_PACKAGE_HAS_LIBOPENVG),y)
-MESA3D_HEADERS_DIRS += VG
+ifeq ($(BR2_PACKAGE_HAS_LIBOPENCL),y)
+MESA3D_HEADERS_DIRS += CL
 endif
 
 define MESA3D_HEADERS_BUILD_CMDS

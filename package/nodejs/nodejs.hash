@@ -1,5 +1,5 @@
-# From upstream URL: http://nodejs.org/dist/v0.10.45/SHASUMS256.txt
-sha256  a71070ea7aece9c94450b45102f2d1be42f0add168dd9c9701e9032d363bd4fa  node-v0.10.45.tar.xz
+# From https://nodejs.org/dist/v10.15.3/SHASUMS256.txt
+sha256 4e22d926f054150002055474e452ed6cbb85860aa7dc5422213a2002ed9791d5  node-v10.15.3.tar.xz
 
-# From upstream URL: http://nodejs.org/dist/v6.2.1/SHASUMS256.txt
-sha256  dbaeb8fb68a599e5164b17c74f66d24f424ee4ab3a25d8de8a3c6808e5b42bfb  node-v6.2.1.tar.xz
+# Hash for license file
+sha256 7ab373b3671d57d91078f5345ea9486443c9ca498eb9f8cf87dee2641a6fa09d  LICENSE

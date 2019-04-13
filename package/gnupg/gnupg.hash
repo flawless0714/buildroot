@@ -1,2 +1,3 @@
-# From https://lists.gnupg.org/pipermail/gnupg-announce/2015q4/000382.html
-sha1	cbc9d960e3d8488c32675019a79fbfbf8680387e	gnupg-1.4.20.tar.bz2
+# Locally computed based on signature
+# https://gnupg.org/ftp/gcrypt/gnupg/gnupg-1.4.23.tar.bz2.sig
+sha256	c9462f17e651b6507848c08c430c791287cd75491f8b5a8b50c6ed46b12678ba	gnupg-1.4.23.tar.bz2

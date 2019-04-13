@@ -1,18 +1,20 @@
-From 95527e43845a5063a6125d7779a30d44c3b437ac Mon Sep 17 00:00:00 2001
+From 93f6bc2b97a2b76a5e725d63d4b6c2dfe7baf63b Mon Sep 17 00:00:00 2001
 From: Peter Seiderer <ps.report@gmx.net>
 Date: Sun, 11 Oct 2015 13:33:19 +0200
 Subject: [PATCH] configure: add '--disable-runtime-tests' option
 
+Signed-off-by: Peter Seiderer <ps.report@gmx.net>
+[Rebased libevdev-1.6.0]
 Signed-off-by: Peter Seiderer <ps.report@gmx.net>
 ---
  configure.ac | 11 +++++++++--
  1 file changed, 9 insertions(+), 2 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
-index 54a2510..286737b 100644
+index 5161d93..2b3bb26 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -74,7 +74,14 @@ else
+@@ -76,7 +76,14 @@ else
  	AC_MSG_WARN([check not found - skipping building unit tests])
  fi
  AM_CONDITIONAL(HAVE_VALGRIND, [test "x$VALGRIND" != "x"])
@@ -28,7 +30,7 @@ index 54a2510..286737b 100644
  AM_CONDITIONAL(ENABLE_STATIC_LINK_TEST, [test "x$enable_static" = "xyes"])
  
  with_cflags=""
-@@ -159,7 +166,7 @@ AC_MSG_RESULT([
+@@ -162,7 +169,7 @@ AC_MSG_RESULT([
  	       Libdir				${libdir}
  
  	       Build documentation		${have_doxygen}
@@ -38,5 +40,5 @@ index 54a2510..286737b 100644
  	       Static library symbol check	${static_symbol_leaks_test}
  	       ])
 -- 
-2.1.4
+2.19.1
 

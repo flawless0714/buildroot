@@ -1,3 +1,6 @@
 # retrieved by scancpan from http://cpan.metacpan.org/
-md5    c9eb502f8aa2586c4a4dce3c784a2a0b XML-LibXML-2.0123.tar.gz
-sha256 0525a2491f152cadee8c63550c79a380fb393851fdfc4c1e6cd5f0f92614f7c4 XML-LibXML-2.0123.tar.gz
+md5    dce687dd8b7e82d1c359fd74b1852f64 XML-LibXML-2.0134.tar.gz
+sha256 f0bca4d0c2da35d879fee4cd13f352014186cedab27ab5e191f39b5d7d4f46cf XML-LibXML-2.0134.tar.gz
+
+# computed by scancpan
+sha256 5046a7ec515cc1542beafdf2eadeeff24cc221fc3fde9913dd144fd263ae6100 LICENSE

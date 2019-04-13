@@ -1,11 +1,11 @@
 # Introduction
-This version of buildroot is specified for riscv64 emulator.
+This branch is specified for **aarch64** running on Qemu.
 
-For more information, please refer to [my note](https://hackmd.io/s/BJkgV_A_V).
+For more information, please refer to [my note](https://hackmd.io/s/HyxvSmwFE).
 
 # Usage
-After the building (if success), you may have rootfs image at directory `output/image`, then you can boot the riscv64 emulator with command `temu run/orig/test_riscv64.cfg` if you have `temu` installed.
+**UNDONE**
 
 # Reference
-- [Original project](https://bellard.org/tinyemu/buildroot.html)
+- [Original project](https://github.com/buildroot/buildroot)
 - [Buildroot](https://buildroot.org/)

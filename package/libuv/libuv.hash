@@ -1,2 +1,3 @@
 # Locally calculated
-sha256  a6ca9f0648973d1463f46b495ce546ddcbe7cce2f04b32e802a15539e46c57ad  libuv-v1.9.1.tar.gz
+sha256  4afcdc84cd315b77c8e532e7b3fde43d536af0e2e835eafbd0e75518ed26dbed  libuv-v1.27.0.tar.gz
+sha256  6d20216ae022fbeed23916f48508fd807ece3d8464992330643b0e64e5c0c24b  LICENSE

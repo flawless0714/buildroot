@@ -1,6 +1,0 @@
-config BR2_PACKAGE_KILO
-    bool "kilo"
-    help
-      A text editor.
-
-      https://github.com/sysprog21/kilo

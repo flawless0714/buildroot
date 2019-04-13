@@ -4,14 +4,8 @@
 #
 ################################################################################
 
-ifneq ($(filter riscv32 riscv64, $(ARCH)),)
-MUSL_VERSION = ad8f00c0ab86c463c12404fe8356031ab4a5e7e4
-MUSL_SITE = $(call github,michaelforney,musl,$(MUSL_VERSION))
-BR_NO_CHECK_HASH_FOR += $(MUSL_SOURCE)
-else
-MUSL_VERSION = 1.1.14
+MUSL_VERSION = 1.1.21
 MUSL_SITE = http://www.musl-libc.org/releases
-endif
 MUSL_LICENSE = MIT
 MUSL_LICENSE_FILES = COPYRIGHT
 
@@ -19,10 +13,12 @@ MUSL_LICENSE_FILES = COPYRIGHT
 # cross-compiler and the kernel headers
 MUSL_DEPENDENCIES = host-gcc-initial linux-headers
 
-# musl does not provide a sys/queue.h implementation, so add the
-# netbsd-queue package that will install a sys/queue.h file in the
-# staging directory based on the NetBSD implementation.
-MUSL_DEPENDENCIES += netbsd-queue
+# musl does not provide an implementation for sys/queue.h or sys/cdefs.h.
+# So, add the musl-compat-headers package that will install those files,
+# into the staging directory:
+#   sys/queue.h:  header from NetBSD
+#   sys/cdefs.h:  minimalist header bundled in Buildroot
+MUSL_DEPENDENCIES += musl-compat-headers
 
 # musl is part of the toolchain so disable the toolchain dependency
 MUSL_ADD_TOOLCHAIN_DEPENDENCY = NO
@@ -62,7 +58,7 @@ endef
 define MUSL_INSTALL_TARGET_CMDS
 	$(TARGET_MAKE_ENV) $(MAKE) -C $(@D) \
 		DESTDIR=$(TARGET_DIR) install-libs
-	$(RM) $(addprefix $(TARGET_DIR)/lib/,crt1.o crtn.o crti.o Scrt1.o)
+	$(RM) $(addprefix $(TARGET_DIR)/lib/,crt1.o crtn.o crti.o rcrt1.o Scrt1.o)
 endef
 
 $(eval $(generic-package))

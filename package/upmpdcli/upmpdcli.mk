@@ -4,27 +4,20 @@
 #
 ################################################################################
 
-UPMPDCLI_VERSION = 1.1.3
+UPMPDCLI_VERSION = 1.4.2
 UPMPDCLI_SITE = http://www.lesbonscomptes.com/upmpdcli/downloads
-UPMPDCLI_LICENSE = GPLv2+
+UPMPDCLI_LICENSE = LGPL-2.1+
 UPMPDCLI_LICENSE_FILES = COPYING
-UPMPDCLI_DEPENDENCIES = libmpdclient libupnpp
+UPMPDCLI_DEPENDENCIES = host-pkgconf libmpdclient libupnpp libmicrohttpd jsoncpp
 
+# Disable spotify plugin which requires dlfcn.h
 ifeq ($(BR2_STATIC_LIBS),y)
-# Upmpdcli forgets to take the dependencies of libupnpp into
-# consideration, breaking static linking, so help it.
-# Libupnpp unfortunately doesn't provide a .pc file, so manually
-# handle the dependencies here.
-# The build system doesn't expand LIBS from the configure step, so
-# manually pass it to make.
-UPMPDCLI_DEPENDENCIES += host-pkgconf
-UPMPDCLI_MAKE_OPTS = \
-	LIBS="`$(PKG_CONFIG_HOST_BINARY) --libs expat libcurl libupnp`"
+UPMPDCLI_CONF_OPTS = --disable-spotify
 endif
 
 # Upmpdcli only runs if user upmpdcli exists
 define UPMPDCLI_USERS
-	upmpdcli -1 upmpdcli -1 * - - - Upmpdcli MPD UPnP Renderer Front-End
+	upmpdcli -1 upmpdcli -1 * - - audio Upmpdcli MPD UPnP Renderer Front-End
 endef
 
 define UPMPDCLI_INSTALL_INIT_SYSV

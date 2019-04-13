@@ -4,9 +4,9 @@
 #
 ################################################################################
 
-IMX_UUC_VERSION = 0.5.1
-IMX_UUC_SITE = $(FREESCALE_IMX_SITE)
-IMX_UUC_LICENSE = GPLv2+
+IMX_UUC_VERSION = 79e9798eee9cd972d92ed2b18f170de856d153c9
+IMX_UUC_SITE = $(call github,NXPmicro,imx-uuc,$(IMX_UUC_VERSION))
+IMX_UUC_LICENSE = GPL-2.0+
 IMX_UUC_LICENSE_FILES = COPYING
 
 # mkfs.vfat is needed to create a FAT partition used by g_mass_storage
@@ -20,8 +20,9 @@ endef
 define IMX_UUC_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 755 $(@D)/uuc $(TARGET_DIR)/usr/bin/uuc
 	$(INSTALL) -D -m 755 $(@D)/sdimage $(TARGET_DIR)/usr/bin/sdimage
+	$(INSTALL) -D -m 755 $(@D)/ufb $(TARGET_DIR)/usr/bin/ufb
 	dd if=/dev/zero of=$(TARGET_DIR)/fat bs=1M count=1
-	$(HOST_DIR)/usr/sbin/mkfs.vfat $(TARGET_DIR)/fat
+	$(HOST_DIR)/sbin/mkfs.vfat $(TARGET_DIR)/fat
 endef
 
 define IMX_UUC_INSTALL_INIT_SYSV

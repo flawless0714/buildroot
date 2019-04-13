@@ -4,37 +4,27 @@
 #
 ################################################################################
 
-EFIVAR_VERSION = 0.23
-EFIVAR_SITE = $(call github,rhinstaller,efivar,$(EFIVAR_VERSION))
-EFIVAR_LICENSE = LGPLv2.1
+EFIVAR_VERSION = 35
+EFIVAR_SITE = $(call github,rhboot,efivar,$(EFIVAR_VERSION))
+EFIVAR_LICENSE = LGPL-2.1
 EFIVAR_LICENSE_FILES = COPYING
-EFIVAR_DEPENDENCIES = popt
 EFIVAR_INSTALL_STAGING = YES
 
-# BINTARGETS is set to skip efivar-static which requires static popt,
-# and since we depend on glibc, we will never be built in a
-# static-only environment.
 # -fPIC is needed at least on MIPS, otherwise fails to build shared
 # -library.
 EFIVAR_MAKE_OPTS = \
 	libdir=/usr/lib \
-	BINTARGETS=efivar \
 	LDFLAGS="$(TARGET_LDFLAGS) -fPIC"
-
-# Explicitly linking with shared libgcc is required on MicroBlaze,
-# otherwise it fails due to FDE encoding in static libgcc.
-ifeq ($(BR2_microblaze),y)
-EFIVAR_MAKE_OPTS += SOFLAGS="-shared -shared-libgcc"
-endif
 
 define EFIVAR_BUILD_CMDS
 	# makeguids is an internal host tool and must be built separately with
 	# $(HOST_CC), otherwise it gets cross-built.
 	$(HOST_MAKE_ENV) $(HOST_CONFIGURE_OPTS) \
-		CFLAGS="$(HOST_CFLAGS) -std=c99" \
-		$(MAKE) -C $(@D)/src makeguids
+		CFLAGS="$(HOST_CFLAGS) -std=gnu99" \
+		$(MAKE) -C $(@D)/src gcc_cflags=  makeguids
 
 	$(TARGET_MAKE_ENV) $(TARGET_CONFIGURE_OPTS) $(MAKE1) -C $(@D) \
+		AR=$(TARGET_AR) NM=$(TARGET_NM) RANLIB=$(TARGET_RANLIB) \
 		$(EFIVAR_MAKE_OPTS) \
 		all
 endef

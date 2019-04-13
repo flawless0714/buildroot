@@ -1,7 +1,10 @@
-From ddcd6cd622889a2d74d0a16efae8e3b2d098f717 Mon Sep 17 00:00:00 2001
+From 794aeeb82ab7c0304e343499ee5d82c1f1c5c39a Mon Sep 17 00:00:00 2001
 From: Carlos Santos <casantos@datacom.ind.br>
 Date: Sun, 8 May 2016 11:11:39 -0300
 Subject: [PATCH] Make FIT support really optional
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
 Due to some mistakes in the source code, it was not possible to really
 turn FIT support off. This commit fixes the problem by means of the
@@ -17,6 +20,13 @@ following changes:
   image-host.o common/image-fit.o to CONFIG_FIT=y, in tools/Makefile.
 
 Signed-off-by: Carlos Santos <casantos@datacom.ind.br>
+[fabio: adapt for 2016.07]
+Signed-off-by: Fabio Estevam <festevam@gmail.com>
+[Ricardo: fix conditional compilation and linking of the files mentioned above
+for 2016.07]
+Signed-off-by: Ricardo Martincoski <ricardo.martincoski@gmail.com>
+[Jörg: adapt for 2019.01]
+Signed-off-by: Jörg Krause <joerg.krause@embedded.rocks>
 ---
  common/bootm.c  | 2 ++
  include/bootm.h | 2 ++
@@ -24,10 +34,10 @@ Signed-off-by: Carlos Santos <casantos@datacom.ind.br>
  3 files changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/common/bootm.c b/common/bootm.c
-index c965326..ab477ba 100644
+index 8bf84ebcb7..ecc29fb7b4 100644
 --- a/common/bootm.c
 +++ b/common/bootm.c
-@@ -891,6 +891,7 @@ void memmove_wd(void *to, void *from, size_t len, ulong chunksz)
+@@ -922,6 +922,7 @@ void memmove_wd(void *to, void *from, size_t len, ulong chunksz)
  	memmove(to, from, len);
  }
  
@@ -35,7 +45,7 @@ index c965326..ab477ba 100644
  static int bootm_host_load_image(const void *fit, int req_image_type)
  {
  	const char *fit_uname_config = NULL;
-@@ -955,5 +956,6 @@ int bootm_host_load_images(const void *fit, int cfg_noffset)
+@@ -986,5 +987,6 @@ int bootm_host_load_images(const void *fit, int cfg_noffset)
  	/* Return the first error we found */
  	return err;
  }
@@ -43,10 +53,10 @@ index c965326..ab477ba 100644
  
  #endif /* ndef USE_HOSTCC */
 diff --git a/include/bootm.h b/include/bootm.h
-index 4981377..94d62a1 100644
+index dbd6f49c2d..f5fe9cb2d3 100644
 --- a/include/bootm.h
 +++ b/include/bootm.h
-@@ -41,7 +41,9 @@ void lynxkdi_boot(image_header_t *hdr);
+@@ -42,7 +42,9 @@ void lynxkdi_boot(image_header_t *hdr);
  
  boot_os_fn *bootm_os_get_boot_func(int os);
  
@@ -57,18 +67,18 @@ index 4981377..94d62a1 100644
  int boot_selected_os(int argc, char * const argv[], int state,
  		     bootm_headers_t *images, boot_os_fn *boot_fn);
 diff --git a/tools/Makefile b/tools/Makefile
-index da50e1b..0a3d279 100644
+index 081383d7a7..4d23c3941e 100644
 --- a/tools/Makefile
 +++ b/tools/Makefile
-@@ -54,6 +54,7 @@ mkenvimage-objs := mkenvimage.o os_support.o lib/crc32.o
- hostprogs-y += dumpimage mkimage
- hostprogs-$(CONFIG_FIT_SIGNATURE) += fit_info fit_check_sign
+@@ -58,6 +58,7 @@ hostprogs-$(CONFIG_FIT_SIGNATURE) += fit_info fit_check_sign
+ 
+ hostprogs-$(CONFIG_CMD_BOOTEFI_SELFTEST) += file2include
  
 +FIT_OBJS-$(CONFIG_FIT) := fit_common.o fit_image.o image-host.o common/image-fit.o
  FIT_SIG_OBJS-$(CONFIG_FIT_SIGNATURE) := common/image-sig.o
- # Flattened device tree objects
- LIBFDT_OBJS := $(addprefix lib/libfdt/, \
-@@ -68,18 +69,15 @@ ROCKCHIP_OBS = lib/rc4.o rkcommon.o rkimage.o rksd.o rkspi.o
+ 
+ # The following files are synced with upstream DTC.
+@@ -80,16 +81,13 @@ ROCKCHIP_OBS = lib/rc4.o rkcommon.o rkimage.o rksd.o rkspi.o
  # common objs for dumpimage and mkimage
  dumpimage-mkimage-objs := aisimage.o \
  			atmelimage.o \
@@ -81,13 +91,11 @@ index da50e1b..0a3d279 100644
  			lib/fdtdec.o \
 -			fit_common.o \
 -			fit_image.o \
- 			gpimage.o \
- 			gpimage-common.o \
 -			common/image-fit.o \
 -			image-host.o \
  			common/image.o \
  			imagetool.o \
  			imximage.o \
 -- 
-2.7.4
+2.20.1
 

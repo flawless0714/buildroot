@@ -4,18 +4,25 @@
 #
 ################################################################################
 
-OWFS_VERSION = 3.1p1
+OWFS_VERSION = 3.2p2
 OWFS_SITE = http://downloads.sourceforge.net/project/owfs/owfs/$(OWFS_VERSION)
 OWFS_DEPENDENCIES = host-pkgconf
 OWFS_CONF_OPTS = --disable-owperl --without-perl5 --disable-owtcl --without-tcl
 
-# 0001-configure.ac-check-for-localtime_r.patch touches configure.ac
+# We're patching configure.ac
 OWFS_AUTORECONF = YES
 
 # owtcl license is declared in module/ownet/c/src/include/ow_functions.h
-OWFS_LICENSE = GPLv2+, LGPLv2 (owtcl)
+OWFS_LICENSE = GPL-2.0+, LGPL-2.0 (owtcl)
 OWFS_LICENSE_FILES = COPYING COPYING.LIB
 OWFS_INSTALL_STAGING = YES
+
+# owfs PHP support is not PHP 7 compliant
+# https://sourceforge.net/p/owfs/support-requests/32/
+OWFS_CONF_OPTS += --disable-owphp --without-php
+
+# Skip man pages processing
+OWFS_CONF_ENV += ac_cv_path_SOELIM=true
 
 ifeq ($(BR2_PACKAGE_LIBFUSE),y)
 OWFS_DEPENDENCIES += libfuse
@@ -35,6 +42,20 @@ else
 OWFS_CONF_OPTS += --disable-owfs
 endif
 
+ifeq ($(BR2_PACKAGE_LIBFTDI1),y)
+OWFS_CONF_OPTS += \
+	--enable-ftdi \
+	--with-libftdi-config=$(STAGING_DIR)/usr/bin/libftdi1-config
+OWFS_DEPENDENCIES += libftdi1
+else ifeq ($(BR2_PACKAGE_LIBFTDI),y)
+OWFS_CONF_OPTS += \
+	--enable-ftdi \
+	--with-libftdi-config=$(STAGING_DIR)/usr/bin/libftdi-config
+OWFS_DEPENDENCIES += libftdi
+else
+OWFS_CONF_OPTS += --disable-ftdi
+endif
+
 ifeq ($(BR2_PACKAGE_LIBUSB),y)
 OWFS_CONF_OPTS += --enable-usb
 OWFS_DEPENDENCIES += libusb
@@ -47,13 +68,6 @@ OWFS_CONF_OPTS += --enable-avahi
 OWFS_DEPENDENCIES += avahi
 else
 OWFS_CONF_OPTS += --disable-avahi
-endif
-
-ifeq ($(BR2_PACKAGE_PHP),y)
-OWFS_CONF_OPTS += --enable-owphp --with-php --with-phpconfig=$(STAGING_DIR)/usr/bin/php-config
-OWFS_DEPENDENCIES += php host-swig
-else
-OWFS_CONF_OPTS += --disable-owphp --without-php
 endif
 
 # setup.py isn't python3 compliant
@@ -69,6 +83,13 @@ OWFS_MAKE_ENV += \
 	_python_prefix=/usr \
 	_python_exec_prefix=/usr
 OWFS_DEPENDENCIES += python host-swig
+# The configure scripts finds PYSITEDIR as the python_lib directory of
+# host-python, and then prepends DESTDIR in front of it. So we end up
+# installing things in $(TARGET_DIR)/$(HOST_DIR)/lib/python which is
+# clearly wrong.
+# Patching owfs to do the right thing is not trivial, it's much easier to
+# override the PYSITEDIR variable in make.
+OWFS_EXTRA_MAKE_OPTS += PYSITEDIR=/usr/lib/python$(PYTHON_VERSION_MAJOR)/site-packages
 else
 OWFS_CONF_OPTS += --disable-owpython --without-python
 endif
@@ -77,6 +98,8 @@ ifeq ($(BR2_STATIC_LIBS),y)
 # zeroconf support uses dlopen()
 OWFS_CONF_OPTS += --disable-zero
 endif
+
+OWFS_MAKE = $(MAKE) $(OWFS_EXTRA_MAKE_OPTS)
 
 define OWFS_INSTALL_INIT_SYSV
 	$(INSTALL) -D -m 0755 $(OWFS_PKGDIR)S25owserver \

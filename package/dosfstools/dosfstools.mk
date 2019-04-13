@@ -4,16 +4,13 @@
 #
 ################################################################################
 
-DOSFSTOOLS_VERSION = 4.0
+DOSFSTOOLS_VERSION = 4.1
 DOSFSTOOLS_SOURCE = dosfstools-$(DOSFSTOOLS_VERSION).tar.xz
 DOSFSTOOLS_SITE = https://github.com/dosfstools/dosfstools/releases/download/v$(DOSFSTOOLS_VERSION)
-DOSFSTOOLS_LICENSE = GPLv3+
+DOSFSTOOLS_LICENSE = GPL-3.0+
 DOSFSTOOLS_LICENSE_FILES = COPYING
 DOSFSTOOLS_CONF_OPTS = --enable-compat-symlinks --exec-prefix=/
 HOST_DOSFSTOOLS_CONF_OPTS = --enable-compat-symlinks
-
-# Avoid target dosfstools dependencies, no host-libiconv
-HOST_DOSFSTOOLS_DEPENDENCIES =
 
 ifeq ($(BR2_PACKAGE_HAS_UDEV),y)
 DOSFSTOOLS_CONF_OPTS += --with-udev
